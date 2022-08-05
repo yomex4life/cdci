@@ -1,4 +1,4 @@
-import { aws_synthetics } from "aws-cdk-lib"
+//import { aws_synthetics } from "aws-cdk-lib"
 
 //import * as synthetics from '@aws-cdk/aws-synthetics-alpha';
 const synthetics =require('Synthetics');

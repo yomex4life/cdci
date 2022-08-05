@@ -4,6 +4,11 @@ import { Function, Code, Runtime, FunctionUrlAuthType, HttpMethod, CfnParameters
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { CreateSthree } from './s3';
 import { LambdaDeploymentGroup, LambdaDeploymentConfig } from 'aws-cdk-lib/aws-codedeploy';
+import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
+import { HttpApi } from '@aws-cdk/aws-apigatewayv2-alpha';
+import { TreatMissingData, Statistic } from 'aws-cdk-lib/aws-cloudwatch';
+//import { HttpApi } from '@aws-cdk/aws-apigatewayv2-alpha;
+//import { HttpApi} from 'aws-cdk-lib/aws-apigatewayv2'
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 interface ServiceStackProps extends StackProps
 {
@@ -38,13 +43,18 @@ export class CdciStack extends Stack {
     aliasName: 'ServiceLambdaAliasProd'
   })
 
-  alias.addFunctionUrl({
-    authType: FunctionUrlAuthType.NONE,
-    cors: {
-      allowedMethods: [HttpMethod.GET],
-      allowedOrigins: ["*"],
-      maxAge: Duration.minutes(1)
-    }
+  // const alislFnUrl = alias.addFunctionUrl({
+  //   authType: FunctionUrlAuthType.NONE,
+  //   cors: {
+  //     allowedMethods: [HttpMethod.GET],
+  //     allowedOrigins: ["*"],
+  //     maxAge: Duration.minutes(1)
+  //   }
+  // });
+
+  const httpApi = new HttpApi(this, "ServiceApi", {
+    defaultIntegration: new HttpLambdaIntegration('LambdaIntegration', alias),
+    apiName: 'MyServiceProd'
   });
 
   //Do this in production so do it in stageName Prod
@@ -52,7 +62,24 @@ export class CdciStack extends Stack {
   {
     new LambdaDeploymentGroup(this, "DeploymentGroup", {
       alias: alias,
-      deploymentConfig: LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES
+      deploymentConfig: LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES,
+      autoRollback: {
+        deploymentInAlarm: true //if any of the alarms returns true, rollback
+      },
+      alarms: [
+        httpApi.metricServerError()
+        .with({
+          period:Duration.minutes(1), //if error stop deployment within a minute  
+          statistic: Statistic.SUM        
+        })
+        .createAlarm(this, 'alarm1', {
+          threshold: 1,
+          alarmDescription: 'Service is experiencing errors',
+          alarmName: 'ServiceErrorAlarmProd',
+          evaluationPeriods: 1, //number of datapoint
+          treatMissingData: TreatMissingData.NOT_BREACHING
+        })
+      ]
     });
   }
  

@@ -16,6 +16,7 @@ export class PipelineStack extends Stack{
         });
 
         const sourceOutput = new Artifact('SourceOutput');
+        const ServiceSourceOutput = new Artifact('ServiceSourceOutput');
 
 
         pipeline.addStage({
@@ -23,16 +24,26 @@ export class PipelineStack extends Stack{
             actions: [
                 new GitHubSourceAction({
                   owner: 'yomex4life',
-                  repo: 'cicd',
+                  repo: 'cdci',
                   branch: 'main',
                   actionName: 'Pipeline_Source',
                   oauthToken: SecretValue.secretsManager('github-token'),
                   output: sourceOutput
-                })
+                }),
+                new GitHubSourceAction({
+                    owner: 'yomex4life',
+                    repo: 'service-lambda',
+                    branch: 'main',
+                    actionName: 'Service_Source',
+                    oauthToken: SecretValue.secretsManager('github-token'),
+                    output: ServiceSourceOutput
+                  })
               ]
         })
 
         const cdkBuildOutput = new Artifact('cdkBuildOutput');
+        const serviceBuildOutput = new Artifact('serviceBuildOutput');
+
 
         pipeline.addStage({
             stageName: "Build",

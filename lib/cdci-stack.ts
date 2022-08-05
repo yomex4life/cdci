@@ -7,6 +7,7 @@ import { LambdaDeploymentGroup, LambdaDeploymentConfig } from 'aws-cdk-lib/aws-c
 import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
 import { HttpApi } from '@aws-cdk/aws-apigatewayv2-alpha';
 import { TreatMissingData, Statistic } from 'aws-cdk-lib/aws-cloudwatch';
+import { ServiceHealthCanary } from './constructs/service-health-canary';
 //import { HttpApi } from '@aws-cdk/aws-apigatewayv2-alpha;
 //import { HttpApi} from 'aws-cdk-lib/aws-apigatewayv2'
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
@@ -58,30 +59,35 @@ export class CdciStack extends Stack {
   });
 
   //Do this in production so do it in stageName Prod
-  if(props.stageName === 'Prod')
-  {
-    new LambdaDeploymentGroup(this, "DeploymentGroup", {
-      alias: alias,
-      deploymentConfig: LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES,
-      autoRollback: {
-        deploymentInAlarm: true //if any of the alarms returns true, rollback
-      },
-      alarms: [
-        httpApi.metricServerError()
-        .with({
-          period:Duration.minutes(1), //if error stop deployment within a minute  
-          statistic: Statistic.SUM        
-        })
-        .createAlarm(this, 'alarm1', {
-          threshold: 1,
-          alarmDescription: 'Service is experiencing errors',
-          alarmName: 'ServiceErrorAlarmProd',
-          evaluationPeriods: 1, //number of datapoint
-          treatMissingData: TreatMissingData.NOT_BREACHING
-        })
-      ]
-    });
-  }
+  
+  new LambdaDeploymentGroup(this, "DeploymentGroup", {
+    alias: alias,
+    deploymentConfig: LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES,
+    autoRollback: {
+      deploymentInAlarm: true //if any of the alarms returns true, rollback
+    },
+    alarms: [
+      httpApi.metricServerError()
+      .with({
+        period:Duration.minutes(1), //if error stop deployment within a minute  
+        statistic: Statistic.SUM        
+      })
+      .createAlarm(this, 'alarm1', {
+        threshold: 1,
+        alarmDescription: 'Service is experiencing errors',
+        alarmName: 'ServiceErrorAlarmProd',
+        evaluationPeriods: 1, //number of datapoint
+        treatMissingData: TreatMissingData.NOT_BREACHING
+      })
+    ]
+  });
+  
+
+  //Synthethic canary to simulate traffic 
+  new ServiceHealthCanary(this, 'ServiceCanary', {
+    apiEndpoint: httpApi.apiEndpoint,
+    canaryName: "service-canary"
+  });
  
   // const fnurl = helloFunction.addFunctionUrl({
   //   authType: FunctionUrlAuthType.NONE,

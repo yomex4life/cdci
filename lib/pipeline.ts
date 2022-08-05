@@ -5,7 +5,7 @@ import { SecretValue, Stack, StackProps } from "aws-cdk-lib";
 import { PipelineProject, LinuxBuildImage, BuildSpec } from "aws-cdk-lib/aws-codebuild";// import * as sqs from 'aws-cdk-lib/aws-sqs';
 
 
-export class PipelineStack extends Stack{
+export class MyPipelineStack extends Stack{
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
     
@@ -47,18 +47,33 @@ export class PipelineStack extends Stack{
 
         pipeline.addStage({
             stageName: "Build",
-            actions: [new CodeBuildAction({
-            actionName: "CDK_build",
-            input: sourceOutput,
-            outputs: [cdkBuildOutput],
-            project: new PipelineProject(this, 'CdkBuildProject', {
-                environment: {
-                buildImage: LinuxBuildImage.STANDARD_6_0
-                },
-                buildSpec:BuildSpec.fromSourceFilename('build-specs/cdk-build-spec.yml')
-            })
-            })]
+            actions: [
+                new CodeBuildAction({
+                actionName: "CDK_build",
+                input: sourceOutput,
+                outputs: [cdkBuildOutput],
+                project: new PipelineProject(this, 'CdkBuildProject', {
+                    environment: {
+                    buildImage: LinuxBuildImage.STANDARD_6_0
+                    },
+                    buildSpec:BuildSpec.fromSourceFilename('build-specs/cdk-build-spec.yml')
+                    })
+                }),
+                new CodeBuildAction({
+                    actionName: "Service_Build",
+                    input: ServiceSourceOutput,
+                    outputs: [serviceBuildOutput],
+                    project: new PipelineProject(this, 'ServiceBuildProject', {
+                        environment: {
+                        buildImage: LinuxBuildImage.STANDARD_6_0
+                        },
+                        buildSpec:BuildSpec.fromSourceFilename('build-specs/service-build-spec.yml')
+                        })
+                    }),
+        
+            ]
         });
+
 
         pipeline.addStage({
             stageName: 'Pipeline_Update',

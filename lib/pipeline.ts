@@ -1,25 +1,32 @@
 import { Construct } from "constructs";
-import { Pipeline, Artifact } from "aws-cdk-lib/aws-codepipeline";
+import { Pipeline, Artifact, IStage } from "aws-cdk-lib/aws-codepipeline";
 import { GitHubSourceAction, CodeBuildAction, CloudFormationCreateUpdateStackAction } from "aws-cdk-lib/aws-codepipeline-actions";
 import { SecretValue, Stack, StackProps } from "aws-cdk-lib";
 import { PipelineProject, LinuxBuildImage, BuildSpec } from "aws-cdk-lib/aws-codebuild";// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { CdciStack } from "./cdci-stack";
 
 
 export class MyPipelineStack extends Stack{
+
+    private readonly pipeline: Pipeline;
+    private readonly cdkBuildOutput: Artifact;
+    private readonly serviceBuildOutput: Artifact;
+
     constructor(scope: Construct, id: string, props?: StackProps) {
         super(scope, id, props);
     
     
-        const pipeline = new Pipeline(this, 'Pipeline', {
+        this.pipeline = new Pipeline(this, 'Pipeline', {
             pipelineName: 'pipeline',
-            crossAccountKeys: false
+            crossAccountKeys: false,
+            restartExecutionOnUpdate: true
         });
 
         const sourceOutput = new Artifact('SourceOutput');
         const ServiceSourceOutput = new Artifact('ServiceSourceOutput');
 
 
-        pipeline.addStage({
+        this.pipeline.addStage({
             stageName: 'Source',
             actions: [
                 new GitHubSourceAction({
@@ -41,17 +48,17 @@ export class MyPipelineStack extends Stack{
               ]
         })
 
-        const cdkBuildOutput = new Artifact('cdkBuildOutput');
-        const serviceBuildOutput = new Artifact('serviceBuildOutput');
+        this.cdkBuildOutput = new Artifact('cdkBuildOutput');
+        this.serviceBuildOutput = new Artifact('serviceBuildOutput');
 
 
-        pipeline.addStage({
+        this.pipeline.addStage({
             stageName: "Build",
             actions: [
                 new CodeBuildAction({
                 actionName: "CDK_build",
                 input: sourceOutput,
-                outputs: [cdkBuildOutput],
+                outputs: [this.cdkBuildOutput],
                 project: new PipelineProject(this, 'CdkBuildProject', {
                     environment: {
                     buildImage: LinuxBuildImage.STANDARD_6_0
@@ -62,7 +69,7 @@ export class MyPipelineStack extends Stack{
                 new CodeBuildAction({
                     actionName: "Service_Build",
                     input: ServiceSourceOutput,
-                    outputs: [serviceBuildOutput],
+                    outputs: [this.serviceBuildOutput],
                     project: new PipelineProject(this, 'ServiceBuildProject', {
                         environment: {
                         buildImage: LinuxBuildImage.STANDARD_6_0
@@ -74,15 +81,33 @@ export class MyPipelineStack extends Stack{
             ]
         });
 
-
-        pipeline.addStage({
-            stageName: 'Pipeline_Update',
+        this.pipeline.addStage({
+            stageName: 'My_Pipeline_Update',
             actions: [
                 new CloudFormationCreateUpdateStackAction({
-                    actionName: 'Pipeline_Update',
+                    actionName: 'My_Pipeline_Update',
                     stackName: 'MyPipelineStack',
-                    templatePath: cdkBuildOutput.atPath('MyPipelineStack.template.json'),
+                    templatePath: this.cdkBuildOutput.atPath('MyPipelineStack.template.json'),
                     adminPermissions: true
+                })
+            ]
+        });
+    }
+
+    public addServiceStage(serviceStack: CdciStack, stageName: string) : IStage
+    {
+        return this.pipeline.addStage({
+            stageName: stageName,
+            actions: [
+                new CloudFormationCreateUpdateStackAction({
+                    actionName: 'Service_Update',
+                    stackName: serviceStack.stackName,
+                    templatePath: this.cdkBuildOutput.atPath(`${serviceStack.stackName}.template.json`),
+                    adminPermissions: true,
+                    parameterOverrides: {
+                        ...serviceStack.serviceCode.assign(this.serviceBuildOutput.s3Location)
+                    },
+                    extraInputs: [this.serviceBuildOutput]
                 })
             ]
         })

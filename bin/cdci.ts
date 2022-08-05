@@ -5,8 +5,11 @@ import { CdciStack } from '../lib/cdci-stack';
 import { MyPipelineStack } from '../lib/pipeline';
 
 const app = new cdk.App();
-new CdciStack(app, 'CdciStack', {
+
+
+const myPipelineStack = new MyPipelineStack(app, 'MyPipelineStack', {});
+const serviceStack = new CdciStack(app, 'CdciStack', {
   
 });
 
-new MyPipelineStack(app, 'MyPipelineStack', {});
+myPipelineStack.addServiceStage(serviceStack, "Prod");

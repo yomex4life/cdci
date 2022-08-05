@@ -1,12 +1,12 @@
 import { Stack, StackProps, RemovalPolicy, Duration } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { Function, Code, Runtime, FunctionUrlAuthType, HttpMethod } from 'aws-cdk-lib/aws-lambda';
+import { Function, Code, Runtime, FunctionUrlAuthType, HttpMethod, CfnParametersCode } from 'aws-cdk-lib/aws-lambda';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { CreateSthree } from './s3';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
 
 export class CdciStack extends Stack {
-  public readonly serviceCode: Code;
+  public readonly serviceCode: CfnParametersCode;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);

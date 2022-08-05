@@ -9,4 +9,4 @@ new CdciStack(app, 'CdciStack', {
   
 });
 
-new MyPipelineStack(app, 'PipelineStack', {});
+new MyPipelineStack(app, 'MyPipelineStack', {});

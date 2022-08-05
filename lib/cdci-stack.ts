@@ -1,14 +1,19 @@
 import { Stack, StackProps, RemovalPolicy, Duration } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { Function, Code, Runtime, FunctionUrlAuthType, HttpMethod, CfnParametersCode } from 'aws-cdk-lib/aws-lambda';
+import { Function, Code, Runtime, FunctionUrlAuthType, HttpMethod, CfnParametersCode, Alias } from 'aws-cdk-lib/aws-lambda';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { CreateSthree } from './s3';
+import { LambdaDeploymentGroup, LambdaDeploymentConfig } from 'aws-cdk-lib/aws-codedeploy';
 // import * as sqs from 'aws-cdk-lib/aws-sqs';
+interface ServiceStackProps extends StackProps
+{
+  stageName: string;
+}
 
 export class CdciStack extends Stack {
   public readonly serviceCode: CfnParametersCode;
 
-  constructor(scope: Construct, id: string, props?: StackProps) {
+  constructor(scope: Construct, id: string, props: ServiceStackProps) {
     super(scope, id, props);
 
     this.serviceCode = Code.fromCfnParameters();
@@ -24,10 +29,16 @@ export class CdciStack extends Stack {
     logRetention: RetentionDays.THREE_DAYS,
     currentVersionOptions: {
       removalPolicy: RemovalPolicy.DESTROY
-    }
+    },
+    description: `Generated on ${new Date().toISOString}` //to update lambda all the time
   });
 
-  const fnurl = helloFunction.addFunctionUrl({
+  const alias = new Alias(this, 'serviceLambdaAlias', {
+    version: helloFunction.latestVersion,
+    aliasName: 'ServiceLambdaAliasProd'
+  })
+
+  alias.addFunctionUrl({
     authType: FunctionUrlAuthType.NONE,
     cors: {
       allowedMethods: [HttpMethod.GET],
@@ -35,5 +46,23 @@ export class CdciStack extends Stack {
       maxAge: Duration.minutes(1)
     }
   });
+
+  //Do this in production so do it in stageName Prod
+  if(props.stageName === 'Prod')
+  {
+    new LambdaDeploymentGroup(this, "DeploymentGroup", {
+      alias: alias,
+      deploymentConfig: LambdaDeploymentConfig.CANARY_10PERCENT_5MINUTES
+    });
+  }
+ 
+  // const fnurl = helloFunction.addFunctionUrl({
+  //   authType: FunctionUrlAuthType.NONE,
+  //   cors: {
+  //     allowedMethods: [HttpMethod.GET],
+  //     allowedOrigins: ["*"],
+  //     maxAge: Duration.minutes(1)
+  //   }
+  // });
   }
 }

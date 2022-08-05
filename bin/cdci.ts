@@ -9,7 +9,7 @@ const app = new cdk.App();
 
 const myPipelineStack = new MyPipelineStack(app, 'MyPipelineStack', {});
 const serviceStack = new CdciStack(app, 'CdciStack', {
-  
+  stageName: 'Prod'
 });
 
 myPipelineStack.addServiceStage(serviceStack, "Prod");
